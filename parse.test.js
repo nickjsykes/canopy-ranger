@@ -1,4 +1,4 @@
-// node --test ranger-app/   — lines copied from the formats in firmware/src/ranger/main.cpp
+// node --test ranger-app/parse.test.js   — lines copied from the formats in firmware/src/ranger/main.cpp
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseLine, LineSplitter, cleanName, distanceM } = require('./parse.js');
