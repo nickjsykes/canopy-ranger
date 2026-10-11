@@ -1,10 +1,11 @@
 // Offline cache. Serve from cache instantly (no signal in the wood), refresh
 // the cache in the background whenever there is signal. Bump VERSION on release.
-const VERSION = 'ranger-v1';
+const VERSION = 'ranger-v2';
 const ASSETS = ['./', './index.html', './app.js', './parse.js', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)));
+  // cache: 'reload' skips the browser's HTTP cache (Pages sets max-age=600), so a new VERSION gets new files
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })))));
   self.skipWaiting();
 });
 

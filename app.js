@@ -161,6 +161,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && (c
 // ------------------------------------------------------------
 let current = null;          // name of the spot being surveyed
 let lastPingAt = 0;
+let pingGap = 5000;            // measured time between pings; the firmware's PING_INTERVAL_MS is 5 s
 
 function onLine(line) {
   const e = parseLine(line);
@@ -174,7 +175,9 @@ function onLine(line) {
         verdict: e.verdict, spot: e.survey ? e.survey.name : '',
         lat: f ? f.lat : null, lon: f ? f.lon : null, acc: f ? f.acc : null,
       });
+      if (lastPingAt) pingGap = Math.min(15000, Math.max(1000, Date.now() - lastPingAt));
       lastPingAt = Date.now();
+      pulse();
       if (e.survey) showSurvey(e.survey.name, e.survey.n, e.survey.of);
       renderLive(); renderMap(); save();
       break;
@@ -207,6 +210,21 @@ function onLine(line) {
       buzz([300, 100, 300]);
       break;
   }
+}
+
+// Between pings the card would sit still for 5 s and look frozen, so show
+// the time since the last reading and a bar filling towards the next one.
+function renderTicker() {
+  if (!lastPingAt) { $('ago').textContent = '–'; $('nextFill').style.width = '0'; return; }
+  const since = Date.now() - lastPingAt;
+  $('ago').textContent = since < 1500 ? 'just now' : Math.round(since / 1000) + ' s ago';
+  $('nextFill').style.width = Math.min(100, 100 * since / pingGap) + '%';
+}
+setInterval(renderTicker, 200);
+
+function pulse() {
+  const el = $('live');
+  el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
 }
 
 // ------------------------------------------------------------
@@ -483,7 +501,7 @@ const Demo = {
     setBle('Demo', 'warn'); renderControls(); keepAwake();
     if (!S.base) { S.base = Object.assign({ acc: 4, t: new Date().toISOString() }, this.base); }
     onLine('CANOPY RANGER 3.0.0 | 868.000 MHz SF10 | pinging');
-    this.timer = setInterval(() => this.tick(), 1200);
+    this.timer = setInterval(() => this.tick(), 5000);   // the real Ranger's pace
   },
   stop() { this.running = false; wantConnected = false; clearInterval(this.timer); setBle('Not connected', ''); renderControls(); },
   pos() {
@@ -492,7 +510,7 @@ const Demo = {
     return { lat: this.base.lat + (r * Math.sin(a * 1.3)) / 110540, lon: this.base.lon + (r * Math.cos(a)) / (111320 * Math.cos(this.base.lat * Math.PI / 180)) };
   },
   tick() {
-    if (!this.survey) this.step++;
+    if (!this.survey) this.step += 4;   // keep the demo walk moving at the slower real ping pace
     const p = this.pos();
     onFix({ coords: { latitude: p.lat, longitude: p.lon, accuracy: 4 + Math.random() * 6 } });
     const d = distanceM(this.base, p);
@@ -538,4 +556,10 @@ S.log.forEach(appendLog);
 if (S.pings.length) lastPingAt = 0;   // restored data shows as stale until live pings arrive
 startGps();
 renderAll();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // A new version activates and takes over straight away; reload once so the
+  // page runs it, but never on the very first install (no previous controller).
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) { save(true); location.reload(); } });
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
