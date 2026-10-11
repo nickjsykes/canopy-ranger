@@ -288,8 +288,12 @@ function renderSpark() {
   const pts = S.pings.slice(-60);
   const lo = -20, hi = 12, y = v => H - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * H;
   ctx.clearRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
   const T = S.thresholds;
+  // same zones as the scale bar: red below MARGINAL, amber up to GOOD, green above
+  ctx.fillStyle = '#991b1b'; ctx.fillRect(0, y(T.marginal), W, H - y(T.marginal));
+  ctx.fillStyle = '#c2620a'; ctx.fillRect(0, y(T.good), W, y(T.marginal) - y(T.good));
+  ctx.fillStyle = '#166534'; ctx.fillRect(0, 0, W, y(T.good));
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
   for (const t of [T.good, T.marginal]) { ctx.beginPath(); ctx.moveTo(0, y(t)); ctx.lineTo(W, y(t)); ctx.stroke(); }
   ctx.setLineDash([]);
   ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '10px system-ui';
@@ -325,7 +329,7 @@ function renderSpots() {
     el.innerHTML = `<div class="top"><span class="name"></span><span class="chip ${cls(s.verdict)}">${s.verdict}</span></div>
       <div class="meta">${d}${s.heard}/${s.sent} heard${s.snrWorst != null ? ' · worst ' + fmt(s.snrWorst) + ' · avg ' + fmt(s.snrAvg) : ''}${s.lat == null ? ' · no GPS' : ' · ±' + s.acc + ' m'} · ${hhmm(s.t)}</div>
       <div class="note"></div>
-      <div class="row"><button data-act="note">Note</button><button data-act="rename">Rename</button></div>`;
+      <div class="row"><button data-act="note">Note</button><button data-act="rename">Rename</button><button data-act="delete">Delete</button></div>`;
     el.querySelector('.name').textContent = s.name;
     el.querySelector('.note').textContent = s.note;
     el.querySelector('[data-act=note]').onclick = () => {
@@ -335,6 +339,10 @@ function renderSpots() {
     el.querySelector('[data-act=rename]').onclick = () => {
       const v = prompt('Rename spot (the Ranger\'s own LIST keeps the old name)', s.name);
       if (v) { S.spots[i].name = cleanName(v) || s.name; save(true); renderSpots(); renderMap(); }
+    };
+    el.querySelector('[data-act=delete]').onclick = () => {
+      if (!confirm('Delete spot "' + s.name + '"? Its pings stay in the walk log.')) return;
+      S.spots.splice(i, 1); save(true); renderSpots(); renderMap(); renderSession();
     };
     box.appendChild(el);
   });

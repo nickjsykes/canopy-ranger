@@ -61,7 +61,7 @@
   .scaleWrap { position: relative; }
   .scaleLabels { position: relative; height: 16px; font-size: 12px; margin-top: 3px; }
   .scaleLabels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
-  #spark { width: 100%; height: 70px; display: block; margin-top: 12px; background: rgba(0,0,0,.12); border-radius: 10px; }
+  #spark { width: 100%; height: 70px; display: block; margin-top: 12px; border-radius: 10px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5); }
 
   #surveyBar { display: none; margin-top: 12px; padding: 14px; border-radius: 16px; background: var(--card); border: 2px solid var(--accent); }
   #surveyBar.on { display: block; }
@@ -84,6 +84,7 @@
   .spot .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .spot .name { font-weight: 700; font-size: 17px; }
   .spot .meta { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .spot [data-act=delete] { color: var(--poor); flex: 0 0 auto; }
   .spot .note { font-size: 14px; margin-top: 6px; font-style: italic; }
   .chip { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
   .chip.GOOD { background: var(--good-soft); color: var(--good); }
