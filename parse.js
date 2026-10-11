@@ -16,6 +16,7 @@
     summary: /^== (.+?): (GOOD|MARGINAL|POOR|NO LINK) — (\d+)\/(\d+) heard(?:, worst SNR ([+-]?\d+), average ([+-]?\d+))?/,
     status:  /\| heard (\d+)\/(\d+) \| spots (\d+) \| batt ([\d.]+) V/,
     hello:   /^CANOPY RANGER (\S+) \| ([\d.]+) MHz SF(\d+) \| (pinging|paused)/,
+    thresholds: /^SNR ([+-]?\d+) or better GOOD, ([+-]?\d+) to ([+-]?\d+) MARGINAL, below ([+-]?\d+) POOR/,
     warn:    /^! (.*)$/,
   };
 
@@ -39,6 +40,8 @@
       return { kind: 'status', heard: +m[1], sent: +m[2], spots: +m[3], batt: +m[4] };
     if ((m = RE.hello.exec(line)))
       return { kind: 'hello', fw: m[1], mhz: +m[2], sf: +m[3], pinging: m[4] === 'pinging' };
+    if ((m = RE.thresholds.exec(line)))
+      return { kind: 'thresholds', good: +m[1], marginal: +m[2] };
     if ((m = RE.warn.exec(line)))
       return { kind: 'warn', text: m[1] };
     return { kind: 'other', text: line };

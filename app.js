@@ -21,7 +21,8 @@ const STORE_KEY = DEMO ? 'canopy_ranger_demo_v1' : 'canopy_ranger_session_v1';  
 //  Session (persisted)
 // ------------------------------------------------------------
 function freshSession() {
-  return { started: new Date().toISOString(), base: null, pings: [], spots: [], log: [], nextTrap: 1 };
+  return { started: new Date().toISOString(), base: null, pings: [], spots: [], log: [], nextTrap: 1,
+           thresholds: { good: -5, marginal: -10 } };   // replaced by what the Ranger reports on connect
 }
 
 let S = load();
@@ -113,6 +114,7 @@ async function openGatt() {
   await txChar.startNotifications();
   connected = true;
   setBle('Live', 'ok');
+  setTimeout(() => send('HELP'), 800);   // the reply includes the board's verdict thresholds
   keepAwake();
   renderControls();
 }
@@ -205,6 +207,10 @@ function onLine(line) {
     case 'status':
       setPill('battPill', e.batt.toFixed(2) + ' V', e.batt < 3.4 ? 'bad' : e.batt < 3.7 ? 'warn' : 'ok');
       break;
+    case 'thresholds':
+      S.thresholds = { good: e.good, marginal: e.marginal };
+      renderScale(); renderSpark(); save();
+      break;
     case 'warn':
       toast(e.text);
       buzz([300, 100, 300]);
@@ -259,6 +265,23 @@ function renderLive() {
   renderSpark();
 }
 
+// Fixed SNR window: -20 (below the SF10 floor) to +12 (where the chip's SNR
+// estimate tops out). Zones come from the board's own thresholds.
+const SCALE_LO = -20, SCALE_HI = 12;
+const scalePct = v => 100 * (Math.max(SCALE_LO, Math.min(SCALE_HI, v)) - SCALE_LO) / (SCALE_HI - SCALE_LO);
+function renderScale() {
+  const T = S.thresholds;
+  $('zPoor').style.width = scalePct(T.marginal) + '%';
+  $('zMarg').style.width = (scalePct(T.good) - scalePct(T.marginal)) + '%';
+  $('zGood').style.width = (100 - scalePct(T.good)) + '%';
+  const lab = (v, t) => `<span style="left:${scalePct(v)}%">${t}</span>`;
+  $('scaleLabels').innerHTML = lab(T.marginal, fmt(T.marginal)) + lab(T.good, fmt(T.good)) +
+    `<span style="left:4%;transform:none">POOR</span><span style="right:0;left:auto;transform:none">GOOD</span>`;
+  const last = S.pings[S.pings.length - 1], m = $('scaleMark');
+  if (last && last.heard) { m.style.display = 'block'; m.style.left = scalePct(last.snr) + '%'; }
+  else m.style.display = 'none';
+}
+
 function renderSpark() {
   const c = $('spark'), ctx = sizeCanvas(c);
   const W = c.clientWidth, H = c.clientHeight;
@@ -266,10 +289,11 @@ function renderSpark() {
   const lo = -20, hi = 12, y = v => H - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * H;
   ctx.clearRect(0, 0, W, H);
   ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
-  for (const t of [-5, -10]) { ctx.beginPath(); ctx.moveTo(0, y(t)); ctx.lineTo(W, y(t)); ctx.stroke(); }
+  const T = S.thresholds;
+  for (const t of [T.good, T.marginal]) { ctx.beginPath(); ctx.moveTo(0, y(t)); ctx.lineTo(W, y(t)); ctx.stroke(); }
   ctx.setLineDash([]);
   ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '10px system-ui';
-  ctx.fillText('-5 GOOD', 4, y(-5) - 3); ctx.fillText('-10 POOR', 4, y(-10) + 11);
+  ctx.fillText(fmt(T.good) + ' GOOD', 4, y(T.good) - 3); ctx.fillText(fmt(T.marginal) + ' POOR', 4, y(T.marginal) + 11);
   const step = W / 59;
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath();
   let pen = false;
@@ -400,7 +424,7 @@ function renderSession() {
     (S.base ? ` · base set ±${S.base.acc} m` : ' · no base set');
 }
 
-function renderAll() { renderLive(); renderSpots(); renderMap(); renderControls(); renderSession(); renderGps(); }
+function renderAll() { renderScale(); renderLive(); renderSpots(); renderMap(); renderControls(); renderSession(); renderGps(); }
 
 // ------------------------------------------------------------
 //  Exports
@@ -501,6 +525,7 @@ const Demo = {
     setBle('Demo', 'warn'); renderControls(); keepAwake();
     if (!S.base) { S.base = Object.assign({ acc: 4, t: new Date().toISOString() }, this.base); }
     onLine('CANOPY RANGER 3.0.0 | 868.000 MHz SF10 | pinging');
+    setTimeout(() => this.command('HELP'), 800);
     this.timer = setInterval(() => this.tick(), 5000);   // the real Ranger's pace
   },
   stop() { this.running = false; wantConnected = false; clearInterval(this.timer); setBle('Not connected', ''); renderControls(); },
@@ -517,7 +542,7 @@ const Demo = {
     const snr = Math.round(10 - d * 0.075 + (Math.random() - 0.5) * 6);
     const heard = snr > -16 && Math.random() > (snr < -12 ? 0.4 : 0.03);
     this.seq++;
-    const v = snr >= -5 ? 'GOOD' : snr >= -10 ? 'MARGINAL' : 'POOR';
+    const T = S.thresholds, v = snr >= T.good ? 'GOOD' : snr >= T.marginal ? 'MARGINAL' : 'POOR';
     let line = heard ? `#${this.seq}  SNR ${snr >= 0 ? '+' : ''}${snr}  ${v}  (${Math.round(-80 - d * 0.12)} dBm)` : `#${this.seq}  no reply`;
     const sv = this.survey;
     if (sv) {
@@ -529,7 +554,8 @@ const Demo = {
       this.survey = null;
       if (!sv.heard) { onLine(`== ${sv.name}: NO LINK — 0/10 heard`); return; }
       const worst = Math.min(...sv.snrs), avg = Math.round(sv.snrs.reduce((a, b) => a + b, 0) / sv.snrs.length);
-      let verdict = worst >= -5 ? 'GOOD' : worst >= -10 ? 'MARGINAL' : 'POOR';
+      const T = S.thresholds;
+      let verdict = worst >= T.good ? 'GOOD' : worst >= T.marginal ? 'MARGINAL' : 'POOR';
       if (sv.heard * 2 < sv.sent) verdict = 'POOR'; else if (sv.heard < sv.sent && verdict === 'GOOD') verdict = 'MARGINAL';
       onLine(`== ${sv.name}: ${verdict} — ${sv.heard}/${sv.sent} heard, worst SNR ${worst >= 0 ? '+' : ''}${worst}, average ${avg >= 0 ? '+' : ''}${avg}`);
     }
@@ -544,7 +570,10 @@ const Demo = {
       onLine(`>> Surveying ${name} — hold still, 10 pings (~50 s)`);
     } else if (V === 'STATUS') {
       onLine(`868.000 MHz SF10 22 dBm | pinging | heard ${this.seq}/${this.seq} | spots 0 | batt 3.96 V`);
-    } else onLine('MARK [name] | LIST | CLEAR | STOP | START | STATUS');
+    } else {
+      onLine('MARK [name] | LIST | CLEAR | STOP | START | STATUS');
+      onLine('SNR -5 or better GOOD, -10 to -5 MARGINAL, below -10 POOR');
+    }
   },
 };
 

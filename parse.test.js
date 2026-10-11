@@ -38,6 +38,12 @@ test('status, hello, warning', () => {
   assert.equal(parseLine('spot,verdict,heard,sent,snr_worst,snr_avg,rssi_avg').kind, 'other');
 });
 
+test('thresholds line (HELP output, %+.0f formatting)', () => {
+  assert.deepEqual(parseLine('SNR -5 or better GOOD, -10 to -5 MARGINAL, below -10 POOR'),
+    { kind: 'thresholds', good: -5, marginal: -10 });
+  assert.equal(parseLine('SNR +0 or better GOOD, -5 to +0 MARGINAL, below -5 POOR').good, 0);
+});
+
 test('splitter rejoins lines and em dashes cut across 20-byte chunks', () => {
   const push = LineSplitter();
   const bytes = new TextEncoder().encode('== trap3: GOOD — 10/10 heard, worst SNR +5, average +7\r\n#5  no reply\r\n');

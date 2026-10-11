@@ -44,8 +44,8 @@
   #live.POOR { background: var(--poor); } #live.NOLINK { background: var(--none); }
   #live.stale { filter: saturate(.25) brightness(.85); }
   .liveTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  #snr { font-size: 84px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  #snr small { font-size: 22px; font-weight: 600; opacity: .85; margin-left: 4px; }
+  #snr { font-size: 76px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #snr small { font-size: 18px; font-weight: 600; opacity: .85; margin-left: 4px; }
   #verdict { font-size: 26px; font-weight: 800; text-align: right; }
   .liveStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: 14px; }
   .liveStats b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
@@ -54,6 +54,13 @@
   .nextRow { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; opacity: .95; }
   .nextTrack { flex: 1; height: 6px; background: rgba(0,0,0,.2); border-radius: 3px; overflow: hidden; }
   #nextFill { height: 100%; width: 0; background: #fff; }
+  .scale { position: relative; margin-top: 14px; height: 14px; border-radius: 7px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6); }
+  .scale div { height: 100%; }
+  .zPoor { background: #7f1d1d; } .zMarg { background: #b45309; } .zGood { background: #14532d; }
+  #scaleMark { position: absolute; top: -3px; width: 4px; height: 20px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 2px rgba(0,0,0,.45); transform: translateX(-2px); display: none; }
+  .scaleWrap { position: relative; }
+  .scaleLabels { position: relative; height: 16px; font-size: 12px; margin-top: 3px; }
+  .scaleLabels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
   #spark { width: 100%; height: 70px; display: block; margin-top: 12px; background: rgba(0,0,0,.12); border-radius: 10px; }
 
   #surveyBar { display: none; margin-top: 12px; padding: 14px; border-radius: 16px; background: var(--card); border: 2px solid var(--accent); }
@@ -121,6 +128,11 @@
   <div class="liveTop">
     <div id="snr">–<small>dB SNR</small></div>
     <div id="verdict">WAITING</div>
+  </div>
+  <div class="scaleWrap">
+    <div class="scale"><div class="zPoor" id="zPoor"></div><div class="zMarg" id="zMarg"></div><div class="zGood" id="zGood"></div></div>
+    <div id="scaleMark"></div>
+    <div class="scaleLabels" id="scaleLabels"></div>
   </div>
   <div class="liveStats">
     <div>RSSI<b id="rssi">–</b></div>
