@@ -1,0 +1,11 @@
+{
+  "name": "Canopy Ranger",
+  "short_name": "Ranger",
+  "description": "LoRa site survey: live signal, marked spots and a GPS coverage log",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14532d",
+  "theme_color": "#14532d",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

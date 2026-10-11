@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Canopy Ranger</title>
+<meta name="theme-color" content="#14532d">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --bg: #f4f5f0; --card: #ffffff; --ink: #1a1f16; --muted: #5f6858; --line: #d9dcd2;
+    --good: #15803d; --marg: #b45309; --poor: #b91c1c; --none: #57534e; --accent: #14532d;
+    --good-soft: #dcfce7; --marg-soft: #fef3c7; --poor-soft: #fee2e2; --none-soft: #e7e5e4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f130d; --card: #1a2016; --ink: #eef2e8; --muted: #9aa491; --line: #2d3527;
+      --good: #22c55e; --marg: #f59e0b; --poor: #ef4444; --none: #a8a29e; --accent: #4ade80;
+      --good-soft: #14321f; --marg-soft: #3a2a0c; --poor-soft: #3b1414; --none-soft: #2a2826;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: env(safe-area-inset-top) 16px calc(16px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 0; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0 auto 0 0; letter-spacing: .02em; }
+  .pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--card);
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .pill.ok { color: var(--good); border-color: var(--good); }
+  .pill.warn { color: var(--marg); border-color: var(--marg); }
+  .pill.bad { color: var(--poor); border-color: var(--poor); }
+
+  button { font: inherit; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); padding: 10px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #0f130d; } }
+  button:disabled { opacity: .5; }
+  #connectBtn { width: 100%; padding: 16px; font-size: 18px; margin-bottom: 12px; }
+
+  #live { border-radius: 20px; padding: 18px 20px; color: #fff; background: var(--none); transition: background .3s; }
+  #live.GOOD { background: var(--good); } #live.MARGINAL { background: var(--marg); }
+  #live.POOR { background: var(--poor); } #live.NOLINK { background: var(--none); }
+  #live.stale { filter: saturate(.25) brightness(.85); }
+  .liveTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  #snr { font-size: 84px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  #snr small { font-size: 22px; font-weight: 600; opacity: .85; margin-left: 4px; }
+  #verdict { font-size: 26px; font-weight: 800; text-align: right; }
+  .liveStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: 14px; }
+  .liveStats b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  #spark { width: 100%; height: 70px; display: block; margin-top: 12px; background: rgba(0,0,0,.12); border-radius: 10px; }
+
+  #surveyBar { display: none; margin-top: 12px; padding: 14px; border-radius: 16px; background: var(--card); border: 2px solid var(--accent); }
+  #surveyBar.on { display: block; }
+  #surveyBar .track { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+  #surveyBar .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+
+  .markRow { display: flex; gap: 8px; margin-top: 12px; }
+  .markRow input { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  #markBtn { padding: 12px 22px; font-size: 18px; }
+  .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .row button { flex: 1; }
+
+  nav { display: flex; gap: 4px; margin: 18px 0 8px; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; border-radius: 10px 10px 0 0; background: none; color: var(--muted); padding: 10px 14px; }
+  nav button.on { color: var(--ink); font-weight: 700; border-bottom: 3px solid var(--accent); }
+  section.tab { display: none; } section.tab.on { display: block; }
+
+  .spot { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; }
+  .spot .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .spot .name { font-weight: 700; font-size: 17px; }
+  .spot .meta { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .spot .note { font-size: 14px; margin-top: 6px; font-style: italic; }
+  .chip { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .chip.GOOD { background: var(--good-soft); color: var(--good); }
+  .chip.MARGINAL { background: var(--marg-soft); color: var(--marg); }
+  .chip.POOR { background: var(--poor-soft); color: var(--poor); }
+  .chip.NOLINK { background: var(--none-soft); color: var(--none); }
+  .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+
+  #map { width: 100%; height: 360px; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; touch-action: none; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+  #log { font: 12px/1.45 ui-monospace, Consolas, monospace; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px; height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+  #log .w { color: var(--poor); font-weight: 700; } #log .s { color: var(--accent); font-weight: 700; }
+  .cmdRow { display: flex; gap: 8px; margin-top: 8px; }
+  .cmdRow input { flex: 1; min-width: 0; font: 14px ui-monospace, Consolas, monospace; padding: 10px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+
+  footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+  footer h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+    padding: 10px 16px; border-radius: 12px; font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; }
+  #toast.on { opacity: 1; }
+  #demoBanner { display: none; background: var(--marg-soft); color: var(--marg); padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Canopy Ranger</h1>
+  <span class="pill" id="blePill">Not connected</span>
+  <span class="pill" id="gpsPill">GPS …</span>
+  <span class="pill" id="battPill" hidden></span>
+</header>
+
+<div id="demoBanner">Demo mode: fake Ranger, fake GPS. Nothing here is real data.</div>
+<button id="connectBtn" class="primary">Connect to Ranger</button>
+
+<div id="live" class="NOLINK stale">
+  <div class="liveTop">
+    <div id="snr">–<small>dB SNR</small></div>
+    <div id="verdict">WAITING</div>
+  </div>
+  <div class="liveStats">
+    <div>RSSI<b id="rssi">–</b></div>
+    <div>To base<b id="dist">–</b></div>
+    <div>Last 10<b id="last10">–</b></div>
+  </div>
+  <canvas id="spark"></canvas>
+</div>
+
+<div id="surveyBar">
+  <div><b id="surveyTitle">Surveying</b>. Hold still at trap height, don't stand between it and the base.</div>
+  <div class="track"><div class="fill" id="surveyFill"></div></div>
+</div>
+
+<div class="markRow">
+  <input id="spotName" placeholder="Spot name, e.g. trap1" maxlength="15" autocomplete="off" autocapitalize="off">
+  <button id="markBtn" class="primary" disabled>MARK</button>
+</div>
+<div class="row">
+  <button id="baseBtn">Set base here</button>
+  <button id="statusBtn" disabled>Battery / status</button>
+</div>
+
+<nav>
+  <button data-tab="spots" class="on">Spots</button>
+  <button data-tab="map">Map</button>
+  <button data-tab="log">Log</button>
+</nav>
+
+<section class="tab on" id="tab-spots"><div id="spots"></div></section>
+
+<section class="tab" id="tab-map">
+  <canvas id="map"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--good)"></i>GOOD</span>
+    <span><i style="background:var(--marg)"></i>MARGINAL</span>
+    <span><i style="background:var(--poor)"></i>POOR</span>
+    <span><i style="background:var(--none)"></i>no reply</span>
+    <span>★ base · ◆ marked spot</span>
+  </div>
+  <div class="hint">Every ping that had a GPS fix, north up. No map tiles, so it works with no signal. Export and drop into ArcGIS/QGIS for the real map.</div>
+</section>
+
+<section class="tab" id="tab-log">
+  <div id="log"></div>
+  <div class="cmdRow">
+    <input id="cmd" placeholder="Command, e.g. LIST" autocomplete="off" autocapitalize="characters">
+    <button id="cmdBtn" disabled>Send</button>
+  </div>
+  <div class="row">
+    <button data-cmd="LIST" disabled>LIST</button>
+    <button data-cmd="STOP" disabled>STOP</button>
+    <button data-cmd="START" disabled>START</button>
+  </div>
+</section>
+
+<footer>
+  <h2>Session</h2>
+  <div class="hint" id="sessionInfo"></div>
+  <div class="row">
+    <button id="exportPings">Pings CSV</button>
+    <button id="exportSpots">Spots CSV</button>
+    <button id="exportGeo">GeoJSON</button>
+  </div>
+  <div class="row"><button id="newSession">New session…</button></div>
+  <div class="hint">Saved on this phone as you go, so a dropped connection or a refresh loses nothing. Open this page once at home with signal so it works offline in the wood.</div>
+</footer>
+
+<div id="toast"></div>
+
+<script src="parse.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
