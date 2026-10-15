@@ -32,7 +32,7 @@
   .pill.warn { color: var(--marg); border-color: var(--marg); }
   .pill.bad { color: var(--poor); border-color: var(--poor); }
 
-  button { font: inherit; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+  button, label.btn { font: inherit; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
     color: var(--ink); padding: 10px 14px; cursor: pointer; }
   button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #0f130d; } }
@@ -93,6 +93,10 @@
   .chip.NOLINK { background: var(--none-soft); color: var(--none); }
   .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
 
+  #map.hasBase { height: 68vh; }
+  .mapRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .mapRow label { cursor: pointer; }
+  .mapRow #mapName { font-size: 13px; color: var(--muted); }
   #map { width: 100%; height: 360px; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; touch-action: none; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 6px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
@@ -167,15 +171,21 @@
 <section class="tab on" id="tab-spots"><div id="spots"></div></section>
 
 <section class="tab" id="tab-map">
+  <div class="mapRow">
+    <label class="btn" for="mapFile">Load map</label>
+    <input type="file" id="mapFile" accept=".json,application/json" hidden>
+    <button id="mapClear" hidden>Remove map</button>
+    <span id="mapName"></span>
+  </div>
   <canvas id="map"></canvas>
   <div class="legend">
     <span><i style="background:var(--good)"></i>GOOD</span>
     <span><i style="background:var(--marg)"></i>MARGINAL</span>
     <span><i style="background:var(--poor)"></i>POOR</span>
     <span><i style="background:var(--none)"></i>no reply</span>
-    <span>★ base · ◆ marked spot</span>
+    <span>★ base · ◆ marked spot · <b style="color:#1a73e8">●</b> you</span>
   </div>
-  <div class="hint">Every ping that had a GPS fix, north up. No map tiles, so it works with no signal. Export and drop into ArcGIS/QGIS for the real map.</div>
+  <div class="hint">Every ping that had a GPS fix, north up. Load a map file (a site map from Canopy) to see the wood behind the dots; it stays on this phone and works with no signal.</div>
 </section>
 
 <section class="tab" id="tab-log">

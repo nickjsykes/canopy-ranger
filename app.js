@@ -54,6 +54,7 @@ function onFix(p) {
   if (surveyFixes) surveyFixes.push(fix);
   renderGps();
   renderLive();
+  renderMap();
 }
 
 function startGps() {
@@ -350,7 +351,61 @@ function renderSpots() {
 const fmt = v => (v > 0 ? '+' : '') + v;
 const hhmm = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });   // stored UTC, shown local
 
-// North-up plot in local metres around the data. No tiles: works offline.
+// ------------------------------------------------------------
+//  Site map: an optional background image with lat/lon bounds, loaded from a
+//  file on the phone. Kept in IndexedDB so it doesn't eat the session's
+//  localStorage, and never shipped with the (public) app.
+// ------------------------------------------------------------
+let baseMap = null;   // {name, bounds {n,s,e,w}, marks [{name,lat,lon,kind}], img}
+function mapDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('canopy_ranger_maps', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('maps');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function mapStore(pack) {
+  try {
+    const db = await mapDb();
+    await new Promise((res, rej) => {
+      const t = db.transaction('maps', 'readwrite'), st = t.objectStore('maps');
+      if (pack) st.put(pack, 'current'); else st.delete('current');
+      t.oncomplete = res; t.onerror = () => rej(t.error);
+    });
+  } catch (e) { toast('Could not save the map on this phone'); }
+}
+async function mapRestore() {
+  try {
+    const db = await mapDb();
+    const pack = await new Promise((res, rej) => {
+      const r = db.transaction('maps').objectStore('maps').get('current');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    if (pack) useMap(pack, false);
+  } catch (e) { /* no IndexedDB: run without a map */ }
+}
+function useMap(pack, store) {
+  const b = pack && pack.bounds;
+  if (!pack || pack.canopyMap !== 1 || !b || !(b.n > b.s) || !(b.e > b.w) || !/^data:image\//.test(pack.image || '')) {
+    toast('That file isn\'t a Canopy map'); return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    baseMap = { name: pack.name || 'Site map', bounds: b, marks: pack.marks || [], img };
+    if (store) { mapStore(pack); toast('Map loaded: ' + baseMap.name); }
+    renderMapControls(); renderMap();
+  };
+  img.onerror = () => toast('Could not read the map image');
+  img.src = pack.image;
+}
+function renderMapControls() {
+  $('mapName').textContent = baseMap ? baseMap.name : '';
+  $('mapClear').hidden = !baseMap;
+  $('map').classList.toggle('hasBase', !!baseMap);
+}
+
+// North-up plot in local metres. Frames the site map if one is loaded,
+// otherwise the data. No tiles: works offline.
 function renderMap() {
   const c = $('map');
   if (!c.offsetParent) return;   // tab hidden
@@ -361,17 +416,35 @@ function renderMap() {
   const css = getComputedStyle(document.documentElement);
   const col = v => css.getPropertyValue({ GOOD: '--good', MARGINAL: '--marg', POOR: '--poor' }[v] || '--none');
   ctx.fillStyle = css.getPropertyValue('--muted'); ctx.font = '13px system-ui';
-  if (!all.length) { ctx.fillText('Nothing with a GPS fix yet.', 16, 28); return; }
+  const me = freshFix();
+  if (!all.length && !baseMap) { ctx.fillText('Nothing with a GPS fix yet.', 16, 28); return; }
 
-  const lat0 = all.reduce((a, p) => a + p.lat, 0) / all.length;
-  const lon0 = all.reduce((a, p) => a + p.lon, 0) / all.length;
+  const bb = baseMap && baseMap.bounds;
+  const ref = bb ? [{ lat: bb.n, lon: bb.w }, { lat: bb.s, lon: bb.e }] : all;
+  const lat0 = ref.reduce((a, p) => a + p.lat, 0) / ref.length;
+  const lon0 = ref.reduce((a, p) => a + p.lon, 0) / ref.length;
   const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
   const xy = p => [(p.lon - lon0) * kx, (p.lat - lat0) * ky];
-  const xs = all.map(p => xy(p)[0]), ys = all.map(p => xy(p)[1]);
-  const span = Math.max(40, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const pad = 28, scale = (Math.min(W, H) - 2 * pad) / span;
+  const xs = ref.map(p => xy(p)[0]), ys = ref.map(p => xy(p)[1]);
+  const spanX = Math.max(40, Math.max(...xs) - Math.min(...xs)), spanY = Math.max(40, Math.max(...ys) - Math.min(...ys));
+  const pad = bb ? 4 : 28;
+  const scale = bb ? Math.min((W - 2 * pad) / spanX, (H - 2 * pad) / spanY) : (Math.min(W, H) - 2 * pad) / Math.max(spanX, spanY);
   const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
   const P = p => { const [x, y] = xy(p); return [W / 2 + (x - cx) * scale, H / 2 - (y - cy) * scale]; };
+
+  if (bb) {
+    const [x1, y1] = P({ lat: bb.n, lon: bb.w }), [x2, y2] = P({ lat: bb.s, lon: bb.e });
+    ctx.drawImage(baseMap.img, x1, y1, x2 - x1, y2 - y1);
+    const kcol = { hub: '#1f4e79', relay: '#7b3fa0', test: '#b4371f', meet: '#d4380d' };
+    ctx.font = 'bold 11px system-ui'; ctx.lineJoin = 'round';
+    baseMap.marks.forEach(m => {
+      const [x, y] = P(m);
+      ctx.fillStyle = kcol[m.kind] || '#333'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.rect(x - 4, y - 4, 8, 8); ctx.fill(); ctx.stroke();
+      const tw = ctx.measureText(m.name).width, tx = x + 7 + tw > W - 4 ? x - 7 - tw : x + 7;   // keep labels on the canvas
+      ctx.lineWidth = 3; ctx.strokeText(m.name, tx, y + 4); ctx.fillText(m.name, tx, y + 4);
+    });
+  }
 
   pts.forEach(p => { const [x, y] = P(p); ctx.fillStyle = col(p.verdict); ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill(); });
   ctx.font = 'bold 12px system-ui';
@@ -386,6 +459,12 @@ function renderMap() {
   if (S.base) {
     const [x, y] = P(S.base);
     ctx.font = '22px system-ui'; ctx.fillStyle = css.getPropertyValue('--accent'); ctx.fillText('★', x - 8, y + 8);
+  }
+  if (me) {   // you are here
+    const [x, y] = P(me);
+    ctx.fillStyle = 'rgba(26,115,232,.15)'; ctx.beginPath(); ctx.arc(x, y, Math.max(6, me.acc * scale), 0, 7); ctx.fill();
+    ctx.fillStyle = '#1a73e8'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); ctx.stroke();
   }
   // scale bar
   const nice = [10, 20, 50, 100, 200, 500, 1000].find(m => m * scale > 60) || 1000;
@@ -503,6 +582,18 @@ document.querySelectorAll('nav button').forEach(b => {
   };
 });
 
+$('mapFile').onchange = e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { useMap(JSON.parse(r.result), true); } catch (x) { toast('That file isn\'t a Canopy map'); } };
+  r.onerror = () => toast('Could not read that file');
+  r.readAsText(f);
+};
+$('mapClear').onclick = () => {
+  if (!confirm('Remove the site map from this phone? Your pings and spots stay.')) return;
+  baseMap = null; mapStore(null); renderMapControls(); renderMap();
+};
 $('exportPings').onclick = exportPings;
 $('exportSpots').onclick = exportSpots;
 $('exportGeo').onclick = exportGeo;
@@ -593,6 +684,8 @@ S.log.forEach(appendLog);
 if (S.pings.length) lastPingAt = 0;   // restored data shows as stale until live pings arrive
 startGps();
 renderAll();
+mapRestore();
+if (DEMO) window.useMap = useMap;   // lets a test load a map pack from the console
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   // A new version activates and takes over straight away; reload once so the
   // page runs it, but never on the very first install (no previous controller).

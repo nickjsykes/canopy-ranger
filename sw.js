@@ -1,6 +1,6 @@
 // Offline cache. Serve from cache instantly (no signal in the wood), refresh
 // the cache in the background whenever there is signal. Bump VERSION on release.
-const VERSION = 'ranger-v4';
+const VERSION = 'ranger-v5';
 const ASSETS = ['./', './index.html', './app.js', './parse.js', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
