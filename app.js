@@ -177,6 +177,7 @@ function onLine(line) {
         t: new Date().toISOString(), seq: e.seq, heard: e.heard, snr: e.snr, rssi: e.rssi,
         verdict: e.verdict, spot: e.survey ? e.survey.name : '',
         lat: f ? f.lat : null, lon: f ? f.lon : null, acc: f ? f.acc : null,
+        base_lat: S.base ? S.base.lat : null, base_lon: S.base ? S.base.lon : null,   // which base heard it
       });
       if (lastPingAt) pingGap = Math.min(15000, Math.max(1000, Date.now() - lastPingAt));
       lastPingAt = Date.now();
@@ -198,6 +199,7 @@ function onLine(line) {
         t: new Date().toISOString(), name: e.name, verdict: e.verdict, heard: e.heard, sent: e.sent,
         snrWorst: e.snrWorst, snrAvg: e.snrAvg, note: '',
         lat: f ? f.lat : null, lon: f ? f.lon : null, acc: f ? f.acc : null,
+        base_lat: S.base ? S.base.lat : null, base_lon: S.base ? S.base.lon : null,
       });
       hideSurvey();
       buzz(e.verdict === 'GOOD' ? [200] : e.verdict === 'MARGINAL' ? [150, 100, 150] : [400, 150, 400, 150, 400]);
@@ -325,7 +327,7 @@ function renderSpots() {
   box.innerHTML = '';
   S.spots.slice().reverse().forEach(s => {
     const i = S.spots.indexOf(s);
-    const d = S.base && s.lat != null ? Math.round(distanceM(S.base, s)) + ' m from base · ' : '';
+    const dm = distTo(s), d = dm != null ? dm + ' m from base · ' : '';
     const el = document.createElement('div'); el.className = 'spot';
     el.innerHTML = `<div class="top"><span class="name"></span><span class="chip ${cls(s.verdict)}">${s.verdict}</span></div>
       <div class="meta">${d}${s.heard}/${s.sent} heard${s.snrWorst != null ? ' · worst ' + fmt(s.snrWorst) + ' · avg ' + fmt(s.snrAvg) : ''}${s.lat == null ? ' · no GPS' : ' · ±' + s.acc + ' m'} · ${hhmm(s.t)}</div>
@@ -530,15 +532,17 @@ function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 const stamp = () => S.started.slice(0, 16).replace(/[-:]/g, '').replace('T', '_');
-const baseCols = s => s.base ? { base_lat: S.base.lat, base_lon: S.base.lon } : {};
+// Distance to the base that was set when the reading was taken (older records without one fall back to the current base).
+const baseOf = r => r.base_lat != null ? { lat: r.base_lat, lon: r.base_lon } : S.base;
+const distTo = r => { const b = baseOf(r); return b && r.lat != null ? Math.round(distanceM(b, r)) : null; };
 
 function exportPings() {
-  const rows = S.pings.map(p => Object.assign({}, p, { dist_m: S.base && p.lat != null ? Math.round(distanceM(S.base, p)) : null }));
-  download(`ranger_pings_${stamp()}.csv`, csv(rows, ['t', 'seq', 'heard', 'snr', 'rssi', 'verdict', 'spot', 'lat', 'lon', 'acc', 'dist_m']), 'text/csv');
+  const rows = S.pings.map(p => Object.assign({}, p, { dist_m: distTo(p) }));
+  download(`ranger_pings_${stamp()}.csv`, csv(rows, ['t', 'seq', 'heard', 'snr', 'rssi', 'verdict', 'spot', 'lat', 'lon', 'acc', 'dist_m', 'base_lat', 'base_lon']), 'text/csv');
 }
 function exportSpots() {
-  const rows = S.spots.map(s => Object.assign({}, s, { dist_m: S.base && s.lat != null ? Math.round(distanceM(S.base, s)) : null }));
-  download(`ranger_spots_${stamp()}.csv`, csv(rows, ['t', 'name', 'verdict', 'heard', 'sent', 'snrWorst', 'snrAvg', 'lat', 'lon', 'acc', 'dist_m', 'note']), 'text/csv');
+  const rows = S.spots.map(s => Object.assign({}, s, { dist_m: distTo(s) }));
+  download(`ranger_spots_${stamp()}.csv`, csv(rows, ['t', 'name', 'verdict', 'heard', 'sent', 'snrWorst', 'snrAvg', 'lat', 'lon', 'acc', 'dist_m', 'base_lat', 'base_lon', 'note']), 'text/csv');
 }
 function exportGeo() {
   const feat = (p, props) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: props });
