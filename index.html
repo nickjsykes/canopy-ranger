@@ -94,6 +94,8 @@
   .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
 
   #map.hasBase { height: 68vh; }
+  .mapSteps { margin: 10px 0 0; padding-left: 22px; font-size: 14px; line-height: 1.45; }
+  .mapSteps li { margin-bottom: 6px; }
   .mapRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .mapRow label { cursor: pointer; }
   .mapRow #mapName { font-size: 13px; color: var(--muted); }
@@ -185,6 +187,7 @@
     <span><i style="background:var(--none)"></i>no reply</span>
     <span>★ base · ◆ marked spot · <b style="color:#1a73e8">●</b> you</span>
   </div>
+  <ol id="mapSteps" class="mapSteps" hidden></ol>
   <div class="hint">Every ping that had a GPS fix, north up. Load a map file (a site map from Canopy) to see the wood behind the dots; it stays on this phone and works with no signal.</div>
 </section>
 

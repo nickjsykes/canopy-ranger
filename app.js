@@ -391,7 +391,7 @@ function useMap(pack, store) {
   }
   const img = new Image();
   img.onload = () => {
-    baseMap = { name: pack.name || 'Site map', bounds: b, marks: pack.marks || [], img };
+    baseMap = { name: pack.name || 'Site map', bounds: b, marks: pack.marks || [], steps: Array.isArray(pack.steps) ? pack.steps : [], img };
     if (store) { mapStore(pack); toast('Map loaded: ' + baseMap.name); }
     renderMapControls(); renderMap();
   };
@@ -402,6 +402,9 @@ function renderMapControls() {
   $('mapName').textContent = baseMap ? baseMap.name : '';
   $('mapClear').hidden = !baseMap;
   $('map').classList.toggle('hasBase', !!baseMap);
+  const ol = $('mapSteps'); ol.innerHTML = '';
+  (baseMap ? baseMap.steps : []).forEach(t => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); });
+  ol.hidden = !(baseMap && baseMap.steps.length);
 }
 
 // North-up plot in local metres. Frames the site map if one is loaded,
@@ -435,7 +438,7 @@ function renderMap() {
   if (bb) {
     const [x1, y1] = P({ lat: bb.n, lon: bb.w }), [x2, y2] = P({ lat: bb.s, lon: bb.e });
     ctx.drawImage(baseMap.img, x1, y1, x2 - x1, y2 - y1);
-    const kcol = { hub: '#1f4e79', relay: '#7b3fa0', test: '#b4371f', meet: '#d4380d' };
+    const kcol = { hub: '#1f4e79', relay: '#7b3fa0', test: '#b4371f', check: '#0b6e99', weak: '#b4371f', meet: '#d4380d' };
     ctx.font = 'bold 11px system-ui'; ctx.lineJoin = 'round';
     baseMap.marks.forEach(m => {
       const [x, y] = P(m);
