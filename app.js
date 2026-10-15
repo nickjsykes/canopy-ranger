@@ -513,7 +513,8 @@ function renderControls() {
 function renderSession() {
   const heard = S.pings.filter(p => p.heard).length;
   $('sessionInfo').textContent = `Started ${new Date(S.started).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · ${S.pings.length} pings (${heard} heard) · ${S.spots.length} spots` +
-    (S.base ? ` · base set ±${S.base.acc} m` : ' · no base set');
+    (S.base ? ` · base set ±${S.base.acc} m` : ' · no base set') +
+    (S.lastSaved ? ` · last saved ${hhmm(S.lastSaved)}` : ' · not saved to a file yet');
 }
 
 function renderAll() { renderScale(); renderLive(); renderSpots(); renderMap(); renderControls(); renderSession(); renderGps(); }
@@ -536,21 +537,18 @@ const stamp = () => S.started.slice(0, 16).replace(/[-:]/g, '').replace('T', '_'
 const baseOf = r => r.base_lat != null ? { lat: r.base_lat, lon: r.base_lon } : S.base;
 const distTo = r => { const b = baseOf(r); return b && r.lat != null ? Math.round(distanceM(b, r)) : null; };
 
-function exportPings() {
-  const rows = S.pings.map(p => Object.assign({}, p, { dist_m: distTo(p) }));
-  download(`ranger_pings_${stamp()}.csv`, csv(rows, ['t', 'seq', 'heard', 'snr', 'rssi', 'verdict', 'spot', 'lat', 'lon', 'acc', 'dist_m', 'base_lat', 'base_lon']), 'text/csv');
-}
-function exportSpots() {
-  const rows = S.spots.map(s => Object.assign({}, s, { dist_m: distTo(s) }));
-  download(`ranger_spots_${stamp()}.csv`, csv(rows, ['t', 'name', 'verdict', 'heard', 'sent', 'snrWorst', 'snrAvg', 'lat', 'lon', 'acc', 'dist_m', 'base_lat', 'base_lon', 'note']), 'text/csv');
-}
-function exportGeo() {
-  const feat = (p, props) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: props });
-  const fs = [];
-  if (S.base) fs.push(feat(S.base, { type: 'base', acc: S.base.acc, t: S.base.t }));
-  S.spots.filter(s => s.lat != null).forEach(s => fs.push(feat(s, Object.assign({ type: 'spot' }, s))));
-  S.pings.filter(p => p.lat != null).forEach(p => fs.push(feat(p, Object.assign({ type: 'ping' }, p))));
-  download(`ranger_${stamp()}.geojson`, JSON.stringify({ type: 'FeatureCollection', features: fs }), 'application/geo+json');
+// One file with everything so far: every ping and every marked spot, one row each, 'type' says which.
+// Nothing is cleared, so it can be pressed as often as you like; the newest file always holds the whole session.
+const SAVE_COLS = ['type', 't', 'name', 'seq', 'heard', 'sent', 'snr', 'rssi', 'verdict', 'snrWorst', 'snrAvg', 'spot',
+                   'lat', 'lon', 'acc', 'dist_m', 'base_lat', 'base_lon', 'note'];
+function saveData() {
+  const rows = S.pings.map(p => Object.assign({ type: 'ping' }, p, { dist_m: distTo(p) }))
+    .concat(S.spots.map(s => Object.assign({ type: 'spot' }, s, { dist_m: distTo(s) })))
+    .sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0));
+  const now = new Date(), hhmm = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+  download(`ranger_${stamp()}_saved_${hhmm}.csv`, csv(rows, SAVE_COLS), 'text/csv');
+  S.lastSaved = now.toISOString(); save(true); renderSession();
+  toast(`Saved ${S.pings.length} pings and ${S.spots.length} spots`);
 }
 
 // ------------------------------------------------------------
@@ -601,13 +599,11 @@ $('mapClear').onclick = () => {
   if (!confirm('Remove the site map from this phone? Your pings and spots stay.')) return;
   baseMap = null; mapStore(null); renderMapControls(); renderMap();
 };
-$('exportPings').onclick = exportPings;
-$('exportSpots').onclick = exportSpots;
-$('exportGeo').onclick = exportGeo;
+$('saveData').onclick = saveData;
 $('newSession').onclick = () => {
   if (!S.pings.length && !S.spots.length) { S = freshSession(); save(true); renderAll(); return; }
-  if (!confirm('Start a new session? The current one is downloaded first (spots CSV, pings CSV, GeoJSON), then cleared from this phone.')) return;
-  exportSpots(); exportPings(); exportGeo();
+  if (!confirm('Start a new session? The current one is saved to a file first, then cleared from this phone.')) return;
+  saveData();
   setTimeout(() => { S = freshSession(); $('log').innerHTML = ''; save(true); renderAll(); toast('New session started'); }, 800);
 };
 
