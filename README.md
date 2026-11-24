@@ -2,6 +2,8 @@
 
 Phone display for the Canopy Ranger, a handheld LoRa link tester used to survey a site before sensors are fitted.
 
+<p align="center"><img src="docs/ranger.jpg" width="260" alt="Canopy Ranger waiting for a Ranger to connect"></p>
+
 Open it in **Chrome on Android**, press **Connect**, and pick "Canopy Ranger". It uses Web Bluetooth, so iPhone Safari won't work.
 
 - Live SNR with a GOOD / MARGINAL / POOR verdict every 5 seconds
